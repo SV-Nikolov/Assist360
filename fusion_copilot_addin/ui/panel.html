@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fusion 360 Copilot Assistant</title>
+    <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+    <div class="copilot-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Copilot Assistant</h1>
+            <div class="header-controls">
+                <button id="settingsBtn" class="icon-btn" title="Settings">⚙️</button>
+                <button id="helpBtn" class="icon-btn" title="Help">❓</button>
+            </div>
+        </div>
+
+        <!-- Context Panel -->
+        <div class="context-panel">
+            <details>
+                <summary>📋 Current Context</summary>
+                <div id="contextInfo" class="context-info">
+                    <p>Loading context...</p>
+                </div>
+            </details>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div id="messages" class="messages-container">
+                <div class="message system">
+                    <p>👋 Welcome to Fusion 360 Copilot! Describe what you want to create or modify, and I'll generate Fusion Python code for you.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <div class="input-controls">
+                <textarea 
+                    id="userInput" 
+                    class="user-input" 
+                    placeholder="Describe what you want to create or modify... (e.g., 'Create a parametric bracket with width/height/thickness parameters')"
+                    rows="3"></textarea>
+                <button id="sendBtn" class="send-btn">Send</button>
+            </div>
+            <div class="input-hints">
+                <small>Ctrl+Enter to send | Use natural language or describe the design intent</small>
+            </div>
+        </div>
+
+        <!-- Code Preview Panel -->
+        <div id="codePanel" class="code-panel" style="display: none;">
+            <div class="code-panel-header">
+                <h3 id="codeTitle">Generated Code</h3>
+                <div class="code-panel-controls">
+                    <button id="explainBtn" class="code-btn" title="Explain">📖 Explain</button>
+                    <button id="copyBtn" class="code-btn" title="Copy">📋 Copy</button>
+                    <button id="applyBtn" class="code-btn apply" title="Apply">✓ Apply</button>
+                    <button id="rejectBtn" class="code-btn reject" title="Reject">✗ Reject</button>
+                </div>
+            </div>
+
+            <!-- Plan -->
+            <div id="planSection" class="plan-section" style="display: none;">
+                <h4>Plan</h4>
+                <ul id="planList" class="plan-list"></ul>
+            </div>
+
+            <!-- Code -->
+            <div class="code-section">
+                <pre id="codeBlock" class="code-block">code will appear here</pre>
+            </div>
+
+            <!-- Notes -->
+            <div id="notesSection" class="notes-section" style="display: none;">
+                <h4>Notes</h4>
+                <p id="noteText"></p>
+            </div>
+        </div>
+
+        <!-- Execution Panel -->
+        <div id="executionPanel" class="execution-panel" style="display: none;">
+            <h3>Execution Result</h3>
+            <div id="executionStatus" class="execution-status">
+                <p>Executing...</p>
+            </div>
+            <div id="executionOutput" class="execution-output"></div>
+            <div class="execution-controls">
+                <button id="undoBtn" class="code-btn" title="Undo">↶ Undo</button>
+                <button id="closeExecutionBtn" class="code-btn">Close</button>
+            </div>
+        </div>
+
+        <!-- Error Panel -->
+        <div id="errorPanel" class="error-panel" style="display: none;">
+            <h3>⚠️ Error</h3>
+            <div id="errorMessage" class="error-message"></div>
+            <details id="stackTraceDetails">
+                <summary>Stack Trace</summary>
+                <pre id="stackTrace"></pre>
+            </details>
+            <div class="error-suggestions" id="errorSuggestions"></div>
+            <button id="fixAndRetryBtn" class="code-btn apply">🔧 Fix and Retry</button>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-group">
+                        <label>LLM Model:</label>
+                        <select id="modelSelect">
+                            <option value="openai">OpenAI GPT-4</option>
+                            <option value="local">Local LLM (Ollama)</option>
+                            <option value="offline">Offline Mode</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label>API Key:</label>
+                        <input type="password" id="apiKey" placeholder="Your API key">
+                    </div>
+                    <div class="setting-group">
+                        <label>Project Root:</label>
+                        <input type="text" id="projectRoot" placeholder="Path to project directory">
+                        <button id="browseFolderBtn">Browse</button>
+                    </div>
+                    <div class="setting-group checkbox">
+                        <input type="checkbox" id="autoRunCheckbox">
+                        <label>Auto-run generated code</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="saveSettingsBtn" class="code-btn apply">Save</button>
+                    <button id="cancelSettingsBtn" class="code-btn reject">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="panel.js"></script>
+</body>
+</html>

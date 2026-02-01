@@ -1,0 +1,16 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "id": "fusion_copilot_assistant",
+  "author": "Assist360",
+  "description": "AI-powered Copilot-style assistant for Fusion 360 - generates parametric parts, CAM setups, and drawings using natural language",
+  "version": "0.1.0",
+  "runOnStartup": true,
+  "uiTypes": [
+    "palette"
+  ],
+  "supportedOS": [
+    "Windows",
+    "Mac"
+  ]
+}

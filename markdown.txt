@@ -1,0 +1,269 @@
+# Fusion 360 Copilot-Style Assistant — Infrastructure Spec
+
+## 1) Goal
+
+Build an AI assistant that behaves like GitHub Copilot in Visual Basic, but for **Autodesk Fusion 360**:
+
+- User types natural language or partial code inside Fusion (or an embedded panel)
+- AI suggests completions / generates blocks of Fusion API Python code
+- User can accept, edit, and run the generated code immediately
+- Assistant can reference the **active document/design**, **selected geometry**, and **local project files** (STL/STEP/IGES/OBJ/images/PDFs)
+- Assistant iterates: refine code, rerun, and adjust until the model/toolpaths/drawings match intent
+
+**Non-goals (explicitly out of scope):**
+- Version control / branching / Git integration
+- UI automation (no clicking buttons or screen scraping)
+- Cloud-only dependency (must be able to run offline if configured)
+
+---
+
+## 2) UX Model — “Copilot in Fusion”
+
+### 2.1 Two modes
+1) **Inline Copilot Mode (code completion)**
+   - User is editing a Fusion Python script/macro
+   - AI generates inline completions + function blocks
+   - Triggered by:
+     - Hotkey (e.g., Ctrl+Enter for “suggest”)
+     - Typing a comment directive like `# ai: ...`
+     - Selecting a region and choosing “Rewrite with AI”
+
+2) **Chat + Apply Mode (instruction → code)**
+   - Docked panel inside Fusion with a chat UI
+   - User describes intent (“Make a parametric bracket…”) or asks changes (“Add 4x M6 holes…”)
+   - AI generates an “Apply Patch”:
+     - New script file
+     - Or modifications to the open script
+     - Or a runnable snippet for the current document
+
+### 2.2 Required features
+- Accept/Reject suggestion (like Copilot)
+- “Explain” button: AI explains what code will do
+- “Run” button: executes code in Fusion
+- “Undo last run” button: uses Fusion’s undo stack
+- Show errors and offer auto-fix suggestions
+
+---
+
+## 3) Execution Model (Must Be Deterministic)
+
+### 3.1 No UI clicking
+All operations must be performed via:
+- Fusion 360 API (Python)
+- Document/design objects (active document, root component, timeline)
+- CAM API for setups/ops
+
+### 3.2 Transaction boundary
+Every AI-generated action must run inside a controlled execution scope:
+- Start action
+- Execute code
+- Capture errors/results
+- End action
+
+If an exception occurs:
+- Stop safely
+- Provide stack trace
+- Offer a corrected patch
+
+### 3.3 “Plan then execute”
+AI produces:
+1) A brief plan (human-readable)
+2) The code
+3) A list of assumptions/inputs it needs (only if truly required)
+
+---
+
+## 4) Fusion 360 Add-in Architecture
+
+### 4.1 Add-in structure (recommended)
+fusion_copilot_addin/
+├── manifest.json
+├── main.py
+├── ui/
+│ ├── panel.html # docked chat UI (if using HTML palette)
+│ ├── panel.js
+│ └── panel.css
+├── core/
+│ ├── orchestrator.py # routes requests to model + tools
+│ ├── context.py # gathers Fusion context (doc, selection, units)
+│ ├── codegen.py # prompt templates + code assembly
+│ ├── executor.py # runs code safely + captures results
+│ └── diagnostics.py # error parsing + auto-fix suggestions
+├── tools/
+│ ├── filesystem.py # project directory scanning (read-only by default)
+│ ├── geometry_extract.py # optional: mesh/STEP metadata extraction
+│ └── vision_extract.py # optional: blueprint/image text extraction
+└── scripts/
+├── sandbox_runner.py # isolated runner utilities
+└── examples/
+
+markdown
+Copy code
+
+### 4.2 UI approach
+Use Fusion’s supported UI options:
+- HTML Palette for chat panel (recommended)
+- Fusion commands/buttons for “Suggest”, “Apply”, “Run”, “Explain”
+
+---
+
+## 5) Context Injection (How It Becomes “Copilot-Like”)
+
+The assistant must always include **current Fusion context** when generating code.
+
+### 5.1 Live Fusion context to capture
+- Active document name
+- Active product (Design / CAM)
+- Units (mm/in)
+- Root component name
+- Current timeline marker (if useful)
+- Selected entities summary (faces/edges/bodies, count, types)
+- Known parameters (user parameters list)
+- Component structure summary (top-level components)
+- CAM setups/operations summary (if CAM workspace active)
+
+Store this in memory as a JSON blob:
+runtime_context = {
+"doc": {...},
+"units": "mm",
+"selection": {...},
+"parameters": [...],
+"components": [...],
+"cam": {...}
+}
+
+yaml
+Copy code
+
+### 5.2 Project directory context (optional but supported)
+User may define a project root folder.
+Assistant can read:
+- `*.stl, *.step, *.iges, *.obj`
+- `*.png, *.jpg, *.pdf` (for blueprints/images)
+- `*.txt, *.md, *.json` (requirements, notes, tool libraries)
+
+**Rules:**
+- Read-only by default
+- Any write must be explicit (“Create a new script file named …”)
+- Never modify user geometry files automatically
+
+### 5.3 Context size control
+Do not dump entire file contents.
+Instead:
+- Include file tree + short snippets
+- Extract structured metadata (dimensions, bounding box, hole patterns)
+- For images/PDF, store extracted text + key dimensions (if available)
+
+---
+
+## 6) Prompting & Code Generation Rules (Copilot Behavior)
+
+### 6.1 Output format (strict)
+When generating code, AI must return:
+
+1) **TITLE**: short task name
+2) **PLAN**: 3–8 bullet steps
+3) **CODE**: Fusion 360 Python code (runnable)
+4) **NOTES**: assumptions + what to change if user wants variations
+
+### 6.2 Code quality requirements
+Generated code must:
+- Use Fusion 360 API best practices
+- Be modular: functions per feature/operation
+- Include minimal safe error handling
+- Avoid hard-coded IDs if parameters exist
+- Prefer user parameters when creating dimensions
+- Be idempotent when reasonable (avoid duplicating features on rerun)
+
+### 6.3 “Patch” semantics
+When modifying an existing script:
+- Return a unified diff patch (preferred), or
+- Return “replace section” instructions
+
+The system applies patch and shows a preview before execution.
+
+---
+
+## 7) Core Workflows (Must Support)
+
+### 7.1 Parametric part generation
+Example user requests:
+- “Create a parametric bracket with width/height/thickness parameters”
+- “Add 4 counterbored holes on a rectangular pattern”
+- “Add fillets/chamfers based on a parameter”
+
+Expected AI output:
+- Adds named user parameters
+- Creates sketches, extrudes, holes, patterns
+- Names features for later edits
+
+### 7.2 Edit existing geometry
+User requests:
+- “Make the walls thicker”
+- “Move holes 10mm outward”
+- “Mirror this feature”
+Expected:
+- AI reads existing parameters/features
+- Updates param values or edits features safely
+
+### 7.3 CAM generation (optional phase 2)
+User requests:
+- “Create a 3-axis setup, face, adaptive, contour, drill holes”
+Expected:
+- Setup creation with correct WCS
+- Tool selection by tool library JSON (if provided)
+- Generates toolpaths and reports warnings
+
+### 7.4 Drawing generation (optional phase 3)
+User requests:
+- “Create a drawing with top/front/right and hole callouts”
+Expected:
+- Drawing script generation (if supported via API)
+- Exports PDF to `drawings/generated/`
+
+---
+
+## 8) Error Handling (Must Feel Like Copilot)
+
+When execution fails:
+- Show readable error summary
+- Show full stack trace in expandable view
+- Offer “Fix and Retry” which:
+  - Diagnoses likely API misuse
+  - Generates a corrected code patch
+  - Keeps user’s intent intact
+
+---
+
+## 9) Offline and Model Options
+
+The system should support:
+- Local LLM (offline) mode
+- Cloud LLM mode (optional)
+- A “safe mode” where AI only suggests code and never executes automatically
+
+**Never require internet to open or use the add-in UI.**
+If cloud model is selected and unavailable, degrade gracefully.
+
+---
+
+## 10) Security & Safety Rules
+
+- No silent file writes
+- No destructive operations without explicit user command
+- Always name newly created features/components
+- Always keep model changes reversible via Fusion undo
+- Never exfiltrate project files without user consent
+
+---
+
+## 11) Definition of Done (Infrastructure)
+
+Infrastructure is complete when:
+- Add-in loads in Fusion 360
+- User can open chat panel and request a part
+- AI generates runnable Fusion Python code
+- User can accept/run/undo
+- AI can read selection + active document context
+- Inline “copilot-style” suggestions work in script editor workflow
+- Errors produce helpful fixes instead of dead ends
